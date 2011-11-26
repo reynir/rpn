@@ -39,22 +39,26 @@ int main(void)
 
 operation loop(void)
 {
+  /* This represents the top of the stack */
   operation top;
+  /* This is the command received from a recursive call */
   operation command;
 
   top = read_op();
   while (1) {
     switch (top.type) {
+      /* "Put" the new value on top of the stack and call recursively */
       case val:
         command = loop();
         switch (command.type) {
-          case val:
-            break;
+          /* We received an operator, return a "partial application" */
           case op:
             command.value = top.value;
             command.type = apply;
             return command;
             break;
+          /* We received a partial application (operator+value). Compute the
+           * result and store it on the top of the stack */
           case apply:
             switch (command.operation) {
               case add:
@@ -65,15 +69,19 @@ operation loop(void)
                 break;
             }
             break;
+          /* End of file received! return the top of the stack. Note that the
+           * inital caller will only see the bottom value of the stack */
           case eof:
             top.type = eof;
             return top;
             break;
         }
         break;
+      /* We read an operator. Return it so someone else can handle it */
       case op:
         return top;
         break;
+      /* We read the end of file. Return it so we can return the result */
       case eof:
         return top;
         break;
@@ -81,12 +89,12 @@ operation loop(void)
   }
 }
 
-#define SEP '|'
-
+/* Dirty hack to skip to next newline */
 void next_line(void)
 {
   while (getchar() != '\n');
 }
+
 
 operation read_op(void)
 {
@@ -107,11 +115,13 @@ operation read_op(void)
     next_line();
   } else {
     i = c - '0';
-    while ((c = getchar()) != EOF && c != '\n') {
+    while ((c = getchar()) != EOF && isdigit(c)) {
       i = i*10 + c - '0';
     }
     res.type = val;
     res.value = i;
+    if (c != '\n')
+      next_line();
   }
 
   return res;
