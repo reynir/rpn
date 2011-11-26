@@ -28,8 +28,11 @@ int main(void)
 
   res = loop();
 
-  if (res.type == eof)
+  if (res.type == eof) {
     printf("Result is: %d\n", res.value);
+  } else if (res.type == op || res.type == apply) {
+    printf("Error: Not enough operands on the stack!\n");
+  }
 
   return 0;
 }
