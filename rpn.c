@@ -2,43 +2,43 @@
 
 /* Types used in the lexer */
 
-enum TOKEN_TYPE {
+typedef enum {
   TOKEN_VAL,
   TOKEN_OP,
   TOKEN_EOF
-};
+} TOKEN;
 
-enum OPERATION {
+typedef enum {
   OPERATION_ADD,
   OPERATION_SUB,
-};
+} OPERATION;
 
 typedef struct {
-  enum TOKEN_TYPE type;
+  TOKEN type;
   union {
     int value;
-    enum OPERATION operation;
+    OPERATION operation;
   } dat;
 } token;
 
 /* Types used in the RPN evaluator */
 
-enum RESULT_TYPE {
+typedef enum {
   RESULT_OP,
   RESULT_PARTIAL,
   RESULT_VALUE
-};
+} RESULT;
 
 typedef struct {
-  enum OPERATION op;
+  OPERATION op;
   int v1;
 } partial;
 
 typedef struct {
-  enum RESULT_TYPE type;
+  RESULT type;
   union {
     int value;
-    enum OPERATION operation;
+    OPERATION operation;
     partial partial;
   } dat;
 } result;
@@ -78,7 +78,7 @@ result loop(void)
           /* We received an operator, return a "partial application" */
           case RESULT_OP:
             {
-              enum OPERATION operation = command.dat.operation;
+              OPERATION operation = command.dat.operation;
               command.dat.partial.v1 = top.dat.value;
               command.dat.partial.op = operation;
               command.type = RESULT_PARTIAL;
