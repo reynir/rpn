@@ -1,128 +1,154 @@
 #include <stdio.h>
 
-enum TYPES {
-  val,
-  op,
-  apply,
-  eof
+/* Types used in the lexer */
+
+enum TOKEN_TYPE {
+  TOKEN_VAL,
+  TOKEN_OP,
+  TOKEN_EOF
 };
 
-enum OPERATIONS {
-  add,
-  sub,
-  bogus
+enum OPERATION {
+  OPERATION_ADD,
+  OPERATION_SUB,
 };
 
-typedef struct operation_ {
-  enum TYPES type;
-  int value;
-  enum OPERATIONS operation;
-} operation;
+typedef struct {
+  enum TOKEN_TYPE type;
+  union {
+    int value;
+    enum OPERATION operation;
+  } dat;
+} token;
 
-operation loop(void);
-operation read_op(void);
+/* Types used in the RPN evaluator */
+
+enum RESULT_TYPE {
+  RESULT_OP,
+  RESULT_PARTIAL,
+  RESULT_VALUE
+};
+
+typedef struct {
+  enum OPERATION op;
+  int v1;
+} partial;
+
+typedef struct {
+  enum RESULT_TYPE type;
+  union {
+    int value;
+    enum OPERATION operation;
+    partial partial;
+  } dat;
+} result;
+
+result loop(void);
+token read_op(void);
 
 int main(void)
 {
-  operation res;
+  result res;
 
   res = loop();
 
-  if (res.type == eof) {
-    printf("Result is: %d\n", res.value);
-  } else if (res.type == op || res.type == apply) {
+  if (res.type == RESULT_VALUE) {
+    printf("Result is: %d\n", res.dat.value);
+  } else if (res.type == RESULT_OP || res.type == RESULT_PARTIAL) {
     printf("Error: Not enough operands on the stack!\n");
   }
 
   return 0;
 }
 
-operation loop(void)
+result loop(void)
 {
-  /* This represents the top of the stack */
-  operation top;
+  /* This will represent the top of the stack */
+  token top;
   /* This is the command received from a recursive call */
-  operation command;
+  result command;
 
   top = read_op();
   while (1) {
     switch (top.type) {
       /* "Put" the new value on top of the stack and call recursively */
-      case val:
+      case TOKEN_VAL:
         command = loop();
         switch (command.type) {
           /* We received an operator, return a "partial application" */
-          case op:
-            command.value = top.value;
-            command.type = apply;
+          case RESULT_OP:
+            {
+              enum OPERATION operation = command.dat.operation;
+              command.dat.partial.v1 = top.dat.value;
+              command.dat.partial.op = operation;
+              command.type = RESULT_PARTIAL;
+            }
             return command;
             break;
-          /* We received a partial application (operator+value). Compute the
-           * result and store it on the top of the stack */
-          case apply:
-            switch (command.operation) {
-              case add:
-                top.value = top.value + command.value;
+	  /* We received a partial application (operator and value). Compute
+	   * the result and store it on the top of the stack */
+          case RESULT_PARTIAL:
+            switch (command.dat.partial.op) {
+              case OPERATION_ADD:
+                top.dat.value = top.dat.value + command.dat.partial.v1;
                 break;
-              case sub:
-                top.value = top.value - command.value;
+              case OPERATION_SUB:
+                top.dat.value = top.dat.value - command.dat.partial.v1;
                 break;
             }
             break;
           /* End of file received! return the top of the stack. Note that the
-           * inital caller will only see the bottom value of the stack */
-          case eof:
-            top.type = eof;
-            return top;
+           * inital caller will only see the bottom value of the stack. This is
+           * okay since on any well formed input the stack will have size one.
+           */
+          case RESULT_VALUE:
+            command.dat.value = top.dat.value;
+            return command;
             break;
         }
         break;
       /* We read an operator. Return it so someone else can handle it */
-      case op:
-        return top;
+      case TOKEN_OP:
+        command.type = RESULT_OP;
+        command.dat.operation = top.dat.operation;
+        return command;
         break;
-      /* We read the end of file. Return it so we can return the result */
-      case eof:
-        return top;
+      /* We read the end of file. Return it so we can return the result. Note
+       * that command.dat.value is undefined. */
+      case TOKEN_EOF:
+        command.type = RESULT_VALUE;
+        return command;
         break;
     }
   }
 }
 
-/* Dirty hack to skip to next newline */
-void next_line(void)
-{
-  while (getchar() != '\n');
-}
-
-
-operation read_op(void)
+token read_op(void)
 {
   int i;
   char c;
-  operation res;
+  token res;
 
-  c = getchar();
-  if (c == EOF || c == '\n') {
-    res.type = eof;
-  } else if (c == '+') {
-    res.type = op;
-    res.operation = add;
-    next_line();
-  } else if (c == '-') {
-    res.type = op;
-    res.operation = sub;
-    next_line();
-  } else {
-    i = c - '0';
-    while ((c = getchar()) != EOF && isdigit(c)) {
-      i = i*10 + c - '0';
+  while (1) {
+    c = getchar();
+    if (c == EOF) {
+      res.type = TOKEN_EOF;
+    } else if (c == '+') {
+      res.type = TOKEN_OP;
+      res.dat.operation = OPERATION_ADD;
+    } else if (c == '-') {
+      res.type = TOKEN_OP;
+      res.dat.operation = OPERATION_SUB;
+    } else if (isdigit(c)) {
+      i = c - '0';
+      while ((c = getchar()) != EOF && isdigit(c)) {
+        i = i*10 + c - '0';
+      }
+      res.type = TOKEN_VAL;
+      res.dat.value = i;
+    } else {
+      continue;
     }
-    res.type = val;
-    res.value = i;
-    if (c != '\n')
-      next_line();
+    return res;
   }
-
-  return res;
 }
